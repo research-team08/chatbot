@@ -14,7 +14,7 @@ const http = require("http");
 // ══════════════════════  CONFIG  ══════════════════════════════
 const CONFIG = {
   timezone: process.env.TIMEZONE || "Asia/Dhaka",
-  cronSchedule: process.env.CRON_SCHEDULE || "50 18 * * *",
+  cronSchedule: process.env.CRON_SCHEDULE || "55 18 * * *",
   spreadsheetId: process.env.SPREADSHEET_ID,
   explicitSheetRange: process.env.SHEET_RANGE,
   sheetName: process.env.SHEET_NAME,
@@ -273,17 +273,80 @@ async function resolveSheetRange(sheets) {
 }
 
 function getGoogleAuth() {
-  if (process.env.GOOGLE_CREDENTIALS) {
-    const credentials = JSON.parse(
-      Buffer.from(process.env.GOOGLE_CREDENTIALS, "base64").toString("utf-8")
-    );
+  const getEnvAny = (...keys) => {
+    for (const key of keys) {
+      if (process.env[key]) return process.env[key];
+    }
+    return "";
+  };
+
+  const envCreds = process.env.GOOGLE_CREDENTIALS;
+  if (envCreds) {
+    let credentials;
+    try {
+      credentials = JSON.parse(envCreds);
+    } catch {
+      try {
+        credentials = JSON.parse(
+          Buffer.from(envCreds, "base64").toString("utf-8")
+        );
+      } catch {
+        throw new Error(
+          "Invalid GOOGLE_CREDENTIALS format. Provide either raw service-account JSON or base64-encoded JSON."
+        );
+      }
+    }
+
     return new google.auth.GoogleAuth({
       credentials,
       scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
     });
   }
+
+  const splitCredentials = {
+    type: getEnvAny("GOOGLE_TYPE", "type"),
+    project_id: getEnvAny("GOOGLE_PROJECT_ID", "project_id"),
+    private_key_id: getEnvAny("GOOGLE_PRIVATE_KEY_ID", "private_key_id"),
+    private_key: getEnvAny("GOOGLE_PRIVATE_KEY", "private_key"),
+    client_email: getEnvAny("GOOGLE_CLIENT_EMAIL", "client_email"),
+    client_id: getEnvAny("GOOGLE_CLIENT_ID", "client_id"),
+    auth_uri: getEnvAny("GOOGLE_AUTH_URI", "auth_uri"),
+    token_uri: getEnvAny("GOOGLE_TOKEN_URI", "token_uri"),
+    auth_provider_x509_cert_url: getEnvAny(
+      "GOOGLE_AUTH_PROVIDER_X509_CERT_URL",
+      "auth_provider_x509_cert_url"
+    ),
+    client_x509_cert_url: getEnvAny(
+      "GOOGLE_CLIENT_X509_CERT_URL",
+      "client_x509_cert_url"
+    ),
+  };
+
+  if (
+    splitCredentials.type &&
+    splitCredentials.project_id &&
+    splitCredentials.private_key &&
+    splitCredentials.client_email
+  ) {
+    splitCredentials.private_key = splitCredentials.private_key.replace(
+      /\\n/g,
+      "\n"
+    );
+    return new google.auth.GoogleAuth({
+      credentials: splitCredentials,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    });
+  }
+
+  const credentialsPath = path.join(__dirname, "credentials.json");
+  if (!fs.existsSync(credentialsPath)) {
+    throw new Error(
+      "Google credentials not found. Set GOOGLE_CREDENTIALS (raw JSON/base64) or split Google vars (type/project_id/private_key/client_email/etc), or provide credentials.json in app root."
+    );
+  }
+
   return new google.auth.GoogleAuth({
-    keyFile: path.join(__dirname, "credentials.json"),
+    keyFile: credentialsPath,
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
 }
@@ -938,5 +1001,3 @@ if (RUN_ONCE_MODE) {
 }
 
 module.exports = { dailyJob, validateConfig, CONFIG, startScheduler, server };
-
-
