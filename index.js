@@ -14,7 +14,7 @@ const http = require("http");
 // ══════════════════════  CONFIG  ══════════════════════════════
 const CONFIG = {
   timezone: process.env.TIMEZONE || "Asia/Dhaka",
-  cronSchedule: process.env.CRON_SCHEDULE || "55 18 * * *",
+  cronSchedule: process.env.CRON_SCHEDULE || "00 8 * * *",
   spreadsheetId: process.env.SPREADSHEET_ID,
   explicitSheetRange: process.env.SHEET_RANGE,
   sheetName: process.env.SHEET_NAME,
@@ -1001,3 +1001,4 @@ if (RUN_ONCE_MODE) {
 }
 
 module.exports = { dailyJob, validateConfig, CONFIG, startScheduler, server };
+
